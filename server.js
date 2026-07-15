@@ -25,6 +25,35 @@ const meta = new Map();
 const connIds = new Map();
 let nextConnId = 1;
 
+// A viewer can ask to watch a session before the target's broadcaster has
+// registered (e.g. the OS "share your screen" picker is still waiting on the
+// player to click something). Instead of silently dropping that watch,
+// queue it here and complete it once the matching broadcaster shows up.
+// sessionId -> Map<viewerId, { ws, timeout }>
+const pendingWatchers = new Map();
+const PENDING_WATCH_TIMEOUT_MS = 30000;
+
+function joinViewerToSession(session, sessionId, ws, m) {
+    const viewerId = m.viewerId || Math.random().toString(36).slice(2);
+    m.viewerId = viewerId;
+    m.sessionId = sessionId;
+    session.viewers.set(viewerId, ws);
+    log(ws, 'viewer', viewerId, 'joined session', sessionId);
+    send(session.broadcaster, { type: 'viewerJoin', viewerId });
+}
+
+function clearPendingWatch(sessionId, viewerWs) {
+    const pending = pendingWatchers.get(sessionId);
+    if (!pending) return;
+    for (const [viewerId, entry] of pending.entries()) {
+        if (entry.ws === viewerWs) {
+            clearTimeout(entry.timeout);
+            pending.delete(viewerId);
+        }
+    }
+    if (pending.size === 0) pendingWatchers.delete(sessionId);
+}
+
 function log(connOrLabel, ...args) {
     const tag = typeof connOrLabel === 'string' ? connOrLabel : `#${connIds.get(connOrLabel) ?? '?'}`;
     console.log(`[${new Date().toISOString()}] [${tag}]`, ...args);
@@ -98,6 +127,19 @@ wss.on('connection', (ws, req) => {
             m.role = 'broadcaster';
             m.sessionId = msg.sessionId;
             log(ws, 'session registered:', msg.sessionId, 'player=', msg.playerName, 'host=', msg.hostName);
+
+            const session = sessions.get(msg.sessionId);
+            const pending = pendingWatchers.get(msg.sessionId);
+            if (pending && pending.size) {
+                log(ws, 'flushing', pending.size, 'watcher(s) queued for', msg.sessionId);
+                for (const [viewerId, entry] of pending.entries()) {
+                    clearTimeout(entry.timeout);
+                    const viewerMeta = meta.get(entry.ws);
+                    if (viewerMeta) joinViewerToSession(session, msg.sessionId, entry.ws, viewerMeta);
+                }
+                pendingWatchers.delete(msg.sessionId);
+            }
+
             broadcastSessionsToViewers();
             return;
         }
@@ -128,16 +170,26 @@ wss.on('connection', (ws, req) => {
 
         if (msg.type === 'watch' && m.role === 'viewer') {
             const session = sessions.get(msg.sessionId);
-            if (!session) {
-                log(ws, 'watch rejected: no such session', msg.sessionId);
+            if (session) {
+                joinViewerToSession(session, msg.sessionId, ws, m);
                 return;
             }
+
+            // Broadcaster hasn't registered yet (target still hasn't picked a
+            // screen/window in the OS share prompt) - queue instead of dropping.
             const viewerId = m.viewerId || Math.random().toString(36).slice(2);
             m.viewerId = viewerId;
             m.sessionId = msg.sessionId;
-            session.viewers.set(viewerId, ws);
-            log(ws, 'viewer', viewerId, 'joined session', msg.sessionId);
-            send(session.broadcaster, { type: 'viewerJoin', viewerId });
+            if (!pendingWatchers.has(msg.sessionId)) pendingWatchers.set(msg.sessionId, new Map());
+            const pending = pendingWatchers.get(msg.sessionId);
+            const timeout = setTimeout(() => {
+                pending.delete(viewerId);
+                if (pending.size === 0) pendingWatchers.delete(msg.sessionId);
+                log(ws, 'watch timed out waiting for broadcaster of', msg.sessionId);
+                send(ws, { type: 'watchTimeout', sessionId: msg.sessionId });
+            }, PENDING_WATCH_TIMEOUT_MS);
+            pending.set(viewerId, { ws, timeout });
+            log(ws, 'watch queued: no broadcaster yet for', msg.sessionId);
             return;
         }
 
@@ -179,6 +231,8 @@ wss.on('connection', (ws, req) => {
                     session.viewers.delete(m.viewerId);
                     log(ws, 'viewer', m.viewerId, 'left session', m.sessionId);
                     send(session.broadcaster, { type: 'viewerLeft', viewerId: m.viewerId });
+                } else {
+                    clearPendingWatch(m.sessionId, ws);
                 }
             }
         }

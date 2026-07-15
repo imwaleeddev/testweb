@@ -54,6 +54,11 @@ function connect() {
         } else if (msg.type === 'stopped') {
             log('session stopped:', msg.sessionId);
             if (msg.sessionId === currentSessionId) closeViewer();
+        } else if (msg.type === 'watchTimeout') {
+            log('watch timed out for session', msg.sessionId);
+            if (msg.sessionId === currentSessionId) {
+                viewerTitle.innerText = 'انتهت المهلة - اللاعب لم يبدأ المشاركة';
+            }
         }
     });
 
