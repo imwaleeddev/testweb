@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>لوحة مراقبة البثوث</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div id="keyGate" class="gate">
+    <div class="card">
+        <h2>دخول لوحة المراقبة</h2>
+        <input id="keyInput" type="password" placeholder="مفتاح الوصول" autocomplete="off" />
+        <button id="keyBtn">دخول</button>
+        <p id="keyError" class="error"></p>
+    </div>
+</div>
+
+<div id="dashboard" class="dashboard hidden">
+    <header>
+        <h1>البثوث النشطة</h1>
+        <button id="logoutBtn">خروج</button>
+    </header>
+    <div id="sessionList" class="session-list"></div>
+</div>
+
+<div id="viewerOverlay" class="viewer-overlay hidden">
+    <div class="viewer-box">
+        <div class="viewer-top">
+            <span id="viewerTitle"></span>
+            <button id="viewerClose">✕</button>
+        </div>
+        <video id="viewerVideo" autoplay playsinline></video>
+    </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

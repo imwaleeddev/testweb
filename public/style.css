@@ -1,0 +1,124 @@
+* { box-sizing: border-box; font-family: Arial, sans-serif; }
+
+html, body {
+    margin: 0;
+    min-height: 100%;
+    background: #0f1216;
+    color: #e6e8eb;
+}
+
+.hidden { display: none !important; }
+
+.gate {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.card {
+    background: #1b1f24;
+    border-radius: 10px;
+    padding: 28px 32px;
+    width: 320px;
+    text-align: center;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+
+.card h2 { margin: 0 0 16px; font-size: 18px; }
+
+.card input {
+    width: 100%;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #333;
+    background: #11151a;
+    color: #fff;
+    margin-bottom: 12px;
+    font-size: 14px;
+}
+
+.card button, header button {
+    padding: 10px 18px;
+    border: none;
+    border-radius: 6px;
+    background: #3b82f6;
+    color: #fff;
+    font-weight: bold;
+    cursor: pointer;
+    width: 100%;
+}
+
+.error { color: #e74c3c; font-size: 13px; min-height: 16px; margin-top: 8px; }
+
+.dashboard { max-width: 900px; margin: 0 auto; padding: 24px; }
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+header h1 { font-size: 20px; margin: 0; }
+header button { width: auto; background: #e74c3c; }
+
+.session-list { display: flex; flex-direction: column; gap: 10px; }
+
+.empty { color: #8b929a; text-align: center; margin-top: 40px; }
+
+.session-card {
+    background: #1b1f24;
+    border-radius: 8px;
+    padding: 14px 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.session-info { display: flex; flex-direction: column; gap: 2px; }
+.session-info strong { font-size: 15px; }
+.session-info span { font-size: 12px; color: #8b929a; }
+
+.session-card button {
+    width: auto;
+    padding: 8px 16px;
+    background: #2ecc71;
+    color: #06210f;
+}
+
+.viewer-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.viewer-box {
+    background: #1b1f24;
+    border-radius: 8px;
+    overflow: hidden;
+    width: min(90vw, 900px);
+}
+
+.viewer-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    background: #11151a;
+    font-size: 14px;
+}
+
+.viewer-top button {
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+    width: auto;
+}
+
+#viewerVideo { width: 100%; display: block; background: #000; }
