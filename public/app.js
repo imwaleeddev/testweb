@@ -13,40 +13,60 @@ const viewerTitle = document.getElementById('viewerTitle');
 
 const iceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
 
+function log(...args) {
+    console.log(`[${new Date().toISOString()}] [screenwatch]`, ...args);
+}
+
 function connect() {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    ws = new WebSocket(`${proto}://${location.host}`);
+    const url = `${proto}://${location.host}`;
+    log('connecting to', url);
+    ws = new WebSocket(url);
 
     ws.addEventListener('open', () => {
+        log('ws open, sending auth');
         ws.send(JSON.stringify({ type: 'auth', key }));
     });
 
     ws.addEventListener('message', (event) => {
         const msg = JSON.parse(event.data);
+        log('recv', msg.type, msg);
 
         if (msg.type === 'authOk') {
+            log('auth OK');
             localStorage.setItem('screenwatch_key', key);
             keyGate.classList.add('hidden');
             dashboard.classList.remove('hidden');
         } else if (msg.type === 'authFail') {
+            log('auth FAILED');
             keyError.innerText = 'مفتاح غير صحيح';
             localStorage.removeItem('screenwatch_key');
             ws.close();
         } else if (msg.type === 'sessions') {
+            log('sessions update:', msg.sessions.length, 'active');
             renderSessions(msg.sessions);
         } else if (msg.type === 'offer') {
+            log('offer received for session', msg.sessionId);
             handleOffer(msg);
         } else if (msg.type === 'candidate') {
-            if (pc) pc.addIceCandidate(msg.candidate).catch(() => {});
+            log('remote ICE candidate received');
+            if (pc) pc.addIceCandidate(msg.candidate).catch((err) => log('addIceCandidate failed:', err));
         } else if (msg.type === 'stopped') {
+            log('session stopped:', msg.sessionId);
             if (msg.sessionId === currentSessionId) closeViewer();
         }
     });
 
     ws.addEventListener('close', () => {
+        log('ws closed');
         if (!dashboard.classList.contains('hidden')) {
+            log('reconnecting in 2s');
             setTimeout(connect, 2000);
         }
+    });
+
+    ws.addEventListener('error', (err) => {
+        log('ws error', err);
     });
 }
 
@@ -80,32 +100,42 @@ function renderSessions(sessions) {
 }
 
 function watchSession(sessionId, playerName) {
+    log('watching session', sessionId, playerName);
     currentSessionId = sessionId;
     viewerTitle.innerText = playerName;
     viewerOverlay.classList.remove('hidden');
 
     pc = new RTCPeerConnection({ iceServers });
     pc.ontrack = (e) => {
+        log('ontrack: received remote stream');
         viewerVideo.srcObject = e.streams[0];
     };
     pc.onicecandidate = (e) => {
         if (e.candidate) {
+            log('sending local ICE candidate');
             ws.send(JSON.stringify({ type: 'candidate', sessionId, candidate: e.candidate }));
         }
     };
+    pc.onconnectionstatechange = () => log('peerconnection state:', pc.connectionState);
+    pc.oniceconnectionstatechange = () => log('ice connection state:', pc.iceConnectionState);
 
     ws.send(JSON.stringify({ type: 'watch', sessionId }));
 }
 
 async function handleOffer(msg) {
-    if (!pc || msg.sessionId !== currentSessionId) return;
+    if (!pc || msg.sessionId !== currentSessionId) {
+        log('ignoring offer: no active pc or session mismatch');
+        return;
+    }
     await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
+    log('sending answer for session', currentSessionId);
     ws.send(JSON.stringify({ type: 'answer', sessionId: currentSessionId, sdp: answer }));
 }
 
 function closeViewer() {
+    log('closing viewer for session', currentSessionId);
     if (pc) {
         pc.close();
         pc = null;
